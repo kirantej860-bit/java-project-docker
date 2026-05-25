@@ -56,6 +56,12 @@ pipeline {
                 sh 'docker build -t devopstej/automation:app Docker-app'
             }
         }
+         stage('trivy for the image scan'){
+            steps{
+                sh 'trivy image devopstej/automation:db'
+                sh 'trivy image devopstej/automation:app'
+            }
+        }
        
         stage('registry'){
             steps{
