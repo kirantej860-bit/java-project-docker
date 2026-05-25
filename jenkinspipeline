@@ -1,0 +1,76 @@
+pipeline {
+    agent {
+        node {
+            label 'kirankumar'
+        }
+    }
+    tools {
+         maven 'mymaven'
+    }
+
+    stages {
+        stage('servercheck') {
+                steps {
+                    sh 'hostname -I'
+                    sh 'hostname'
+                }
+            }
+        stage('nodeinfo') {
+                steps {
+                    echo "Node Name: ${env.NODE_NAME}"
+                    echo "Workspace: ${env.WORKSPACE}"
+                }
+            }
+        stage('cd') {
+            steps {
+                git 'https://github.com/kirantej860-bit/dockerwebapp.git'
+            }
+        }
+        stage('CQA'){
+            steps {
+                     withSonarQubeEnv('TejKiran') {
+                      sh "mvn clean verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=javaproject -Dsonar.projectName='javaproject'"
+                    }
+            }
+        }
+        stage('build') {
+            steps {
+                sh 'mvn clean package'
+                sh 'cp -r target Docker-app'
+            }
+        }
+        stage('workspace'){
+            steps{
+                sh 'pwd'
+                sh 'echo $WORKSPACE'
+            }
+        }
+        stage('artifacte') {
+            steps {
+                nexusArtifactUploader artifacts: [[artifactId: 'vprofile', classifier: '', file: 'target/vprofile-v2.war', type: 'war']], credentialsId: 'nexus', groupId: 'com.visualpathit', nexusUrl: '13.63.45.232:8081', nexusVersion: 'nexus3', protocol: 'http', repository: 'mynexus', version: 'v2'
+            }
+        }
+        stage('images'){
+            steps{
+                sh 'docker build -t devopstej/automation:db Docker-db'
+                sh 'docker build -t devopstej/automation:app Docker-app'
+            }
+        }
+       
+        stage('registry'){
+            steps{
+                script{
+                withDockerRegistry(credentialsId: 'registry') {
+                    sh 'docker push devopstej/automation:db'
+                    sh 'docker push devopstej/automation:app'
+                }
+                }
+            }
+        }
+         stage('deploy'){
+            steps{
+                sh 'docker stack deploy -c compose.yml java'
+            }
+        }
+    }
+}
